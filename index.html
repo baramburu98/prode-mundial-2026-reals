@@ -1123,11 +1123,13 @@ function renderAdmin(){
     <button class="${adminSub==='esp'?'on':''}" onclick="setAdminSub('esp')">Especiales</button>
     <button class="${adminSub==='grp'?'on':''}" onclick="setAdminSub('grp')">Grupos</button>
     <button class="${adminSub==='ko'?'on':''}" onclick="setAdminSub('ko')">Eliminatoria</button>
+    <button class="${adminSub==='preds'?'on':''}" onclick="setAdminSub('preds')">Ver predicciones</button>
     <button class="${adminSub==='users'?'on':''}" onclick="setAdminSub('users')">Usuarios</button>
   </nav>`;
   if(adminSub==='esp') h += renderAdminEsp();
   if(adminSub==='grp') h += renderAdminGrp();
   if(adminSub==='ko')  h += renderAdminKO();
+  if(adminSub==='preds') h += renderAdminPreds();
   if(adminSub==='users') h += renderAdminUsers();
   document.getElementById('tab-admin').innerHTML = h;
 }
@@ -1330,6 +1332,136 @@ function renderAdminUsers(){
 function adminDelUser(n){
   if(!confirm(`¿Borrar usuario "${n}" y sus predicciones?`)) return;
   deleteUser(n).then(()=>render());
+}
+
+let adminSelectedUser = '';
+function setAdminSelectedUser(n){adminSelectedUser=n;render()}
+function renderAdminPreds(){
+  const names = Object.keys(users).sort();
+  if(names.length===0) return `<div class="card"><p class="muted">No hay participantes registrados.</p></div>`;
+  let h = '';
+  // ============ RESUMEN GLOBAL ============
+  h += `<div class="card"><h3>Resumen de predicciones especiales (todos los participantes)</h3>`;
+  h += `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
+    <th>Participante</th>
+    <th style="text-align:left">Campeón</th>
+    <th style="text-align:left">Sub</th>
+    <th style="text-align:left">3°</th>
+    <th style="text-align:left">+ Goleador</th>
+    <th style="text-align:left">+ Goleado</th>
+    <th style="text-align:left">Goleador</th>
+    <th style="text-align:left">Lesionado</th>
+    <th style="text-align:left">Punto Gol</th>
+    <th>Cargados</th>
+  </tr></thead><tbody>`;
+  names.forEach(n=>{
+    const p = preds[n]||{};
+    const sp = p.sp||{};
+    const cnt = p.m?Object.values(p.m).filter(x=>x.h!=null && x.a!=null).length:0;
+    const fmt = c => c ? `${flagImg(c,14)} ${teamName(c)}` : '<span class="muted">—</span>';
+    const pgList = (p.pg||[]).filter(x=>x).join(', ') || '<span class="muted">—</span>';
+    h += `<tr>
+      <td><b>${n}</b></td>
+      <td style="text-align:left">${fmt(sp.campeon)}</td>
+      <td style="text-align:left">${fmt(sp.subcampeon)}</td>
+      <td style="text-align:left">${fmt(sp.tercero)}</td>
+      <td style="text-align:left">${fmt(sp.masGoleador)}</td>
+      <td style="text-align:left">${fmt(sp.masGoleado)}</td>
+      <td style="text-align:left">${sp.goleador||'<span class="muted">—</span>'}</td>
+      <td style="text-align:left">${sp.lesionado||'<span class="muted">—</span>'}</td>
+      <td style="text-align:left">${pgList}</td>
+      <td>${cnt}/104</td>
+    </tr>`;
+  });
+  h += `</tbody></table></div></div>`;
+
+  // ============ DETALLE POR USUARIO ============
+  h += `<div class="card"><h3>Ver predicciones detalladas de un participante</h3>
+    <div class="row" style="margin-bottom:10px">
+      <label>Participante:</label>
+      <select onchange="setAdminSelectedUser(this.value)" style="min-width:200px">
+        <option value="">— Elegí uno —</option>
+        ${names.map(n=>`<option value="${n}" ${adminSelectedUser===n?'selected':''}>${n}</option>`).join('')}
+      </select>
+    </div>`;
+  if(!adminSelectedUser || !users[adminSelectedUser]){h+=`</div>`;return h}
+  const n = adminSelectedUser;
+  const p = preds[n] || {m:{},sp:{},pg:[],t3:{}};
+  const sp = p.sp||{};
+  const b = calcBreakdown(n);
+  const tot = b.esp+b.grp+b.r32+b.r16+b.qf+b.sf+b.fin;
+  // Resumen de puntos
+  h += `<div style="margin-bottom:14px;padding:10px;background:var(--panel2);border-radius:6px">
+    <div style="font-size:13px;color:var(--mute);margin-bottom:4px">Puntos totales:</div>
+    <div style="font-size:22px;font-weight:800;color:var(--acc2)">${tot}</div>
+    <div style="font-size:11px;color:var(--mute);margin-top:4px">
+      ESP ${b.esp} · GRP ${b.grp} · R32 ${b.r32} · OCT ${b.r16} · CTO ${b.qf} · SF ${b.sf} · FIN ${b.fin}
+    </div>
+  </div>`;
+  // Especiales
+  h += `<details open style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600;padding:6px 0">Especiales</summary>
+    <div class="adminlist" style="padding-left:10px">
+      <div><b>Campeón:</b> ${sp.campeon?teamName(sp.campeon):'<span class="muted">—</span>'}</div>
+      <div><b>Subcampeón:</b> ${sp.subcampeon?teamName(sp.subcampeon):'<span class="muted">—</span>'}</div>
+      <div><b>3er puesto:</b> ${sp.tercero?teamName(sp.tercero):'<span class="muted">—</span>'}</div>
+      <div><b>Más goleador:</b> ${sp.masGoleador?teamName(sp.masGoleador):'<span class="muted">—</span>'}</div>
+      <div><b>Más goleado:</b> ${sp.masGoleado?teamName(sp.masGoleado):'<span class="muted">—</span>'}</div>
+      <div><b>Más expulsados:</b> ${sp.masExpulsados?teamName(sp.masExpulsados):'<span class="muted">—</span>'}</div>
+      <div><b>Goleador:</b> ${sp.goleador||'<span class="muted">—</span>'}</div>
+      <div><b>Lesionado:</b> ${sp.lesionado||'<span class="muted">—</span>'}</div>
+      <div><b>Punto Gol:</b> ${(p.pg||[]).filter(x=>x).join(', ')||'<span class="muted">—</span>'}</div>
+    </div>
+  </details>`;
+  // Grupos
+  h += `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600;padding:6px 0">Predicciones de grupo (72 partidos)</summary>`;
+  GROUP_LETTERS.forEach(grp=>{
+    const stPred = calcStandings(grp, predSrc(n));
+    h += `<div style="margin:10px 0"><h4 style="margin:6px 0;font-size:13px">Grupo ${grp}</h4>`;
+    h += `<table style="font-size:12px"><thead><tr><th>Partido</th><th>Pred</th><th>Real</th><th>Pts</th></tr></thead><tbody>`;
+    MATCHES.filter(m=>m.grp===grp).forEach(m=>{
+      const pr = (p.m&&p.m[m.id])||{};
+      const rr = real.m[m.id]||{};
+      const pts = matchPoints(n, m.id);
+      h += `<tr>
+        <td style="text-align:left">${teamName(m.t1)} vs ${teamName(m.t2)}</td>
+        <td>${pr.h!=null?`${pr.h}-${pr.a}`:'<span class="muted">—</span>'}</td>
+        <td>${rr.h!=null?`<b>${rr.h}-${rr.a}</b>`:'<span class="muted">—</span>'}</td>
+        <td style="color:var(--acc2)">${pts?'+'+pts.total:''}</td>
+      </tr>`;
+    });
+    h += `</tbody></table>`;
+    h += `<div style="font-size:11px;color:var(--mute);margin-top:4px">Tabla predicha: ${stPred.map((r,i)=>`${i+1}° ${teamName(r.t)} (${r.pts}pts)`).join(' · ')}</div>`;
+    h += `</div>`;
+  });
+  h += `</details>`;
+  // Eliminatoria
+  h += `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600;padding:6px 0">Predicciones de eliminatoria (32 partidos)</summary>`;
+  const stages = ['R32','R16','QF','SF','TP','FIN'];
+  stages.forEach(stg=>{
+    const stgMatches = MATCHES.filter(m=>m.stg===stg);
+    if(stgMatches.length===0) return;
+    h += `<h4 style="margin:10px 0 4px 0;font-size:13px">${STAGE_LABEL[stg]}</h4>`;
+    h += `<table style="font-size:12px"><thead><tr><th>M</th><th style="text-align:left">Cruce predicho</th><th>Marcador</th><th>Real</th><th>Pts</th></tr></thead><tbody>`;
+    stgMatches.forEach(m=>{
+      const pr = (p.m&&p.m[m.id])||{};
+      const rr = real.m[m.id]||{};
+      const t1p = resolveTeamPred(m.s1, n), t2p = resolveTeamPred(m.s2, n);
+      const pts = matchPoints(n, m.id);
+      const penPred = pr.h!=null&&pr.a!=null&&pr.h===pr.a&&pr.ph!=null?` (P${pr.ph}-${pr.pa})`:'';
+      const penReal = rr.h!=null&&rr.a!=null&&rr.h===rr.a&&rr.ph!=null?` (P${rr.ph}-${rr.pa})`:'';
+      h += `<tr>
+        <td>M${m.id}</td>
+        <td style="text-align:left">${t1p?teamName(t1p):m.s1} vs ${t2p?teamName(t2p):m.s2}</td>
+        <td>${pr.h!=null?`${pr.h}-${pr.a}${penPred}`:'<span class="muted">—</span>'}</td>
+        <td>${rr.h!=null?`<b>${rr.h}-${rr.a}${penReal}</b>`:'<span class="muted">—</span>'}</td>
+        <td style="color:var(--acc2)">${pts?'+'+pts.total:''}</td>
+      </tr>`;
+    });
+    h += `</tbody></table>`;
+  });
+  h += `</details>`;
+  h += `</div>`;
+  return h;
 }
 function adminClearReal(){
   if(!confirm('¿Borrar TODOS los resultados reales? (No afecta predicciones)')) return;
