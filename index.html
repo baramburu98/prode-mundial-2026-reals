@@ -313,7 +313,7 @@ const MATCHES = [
 const MATCH_BY_ID = Object.fromEntries(MATCHES.map(m=>[m.id,m]));
 const STAGE_LABEL = {R32:'Ronda 32',R16:'Octavos',QF:'Cuartos',SF:'Semifinal',TP:'3er puesto',FIN:'Final'};
 
-const DEADLINE_GRP_MS = Date.parse('2026-06-11T01:00:00Z'); // 10 jun 22:00 ART
+const DEADLINE_GRP_MS = Date.parse('2026-06-11T18:00:00Z'); // 11 jun 15:00 ART
 const DEADLINE_KO_MS  = Date.parse('2026-06-28T16:00:00Z'); // 28 jun 13:00 ART
 
 /* ============ STATE & FIREBASE ============ */
@@ -407,7 +407,15 @@ firebase.auth().signInAnonymously().then(() => {
   db.ref('real').on('value', snap=>{ const v=snap.val(); real = v||{m:{},t3:{},phase:'groups',koClosed:false}; normalizeState(); dataReady.real=true; checkInit(); });
   db.ref('realSp').on('value', snap=>{ realSp = snap.val()||{}; dataReady.realSp=true; checkInit(); });
   db.ref('realGoals').on('value', snap=>{ realGoals = snap.val()||{pg:{}}; if(!realGoals.pg) realGoals.pg={}; dataReady.realGoals=true; checkInit(); });
-}).catch(err => { console.error('Firebase auth error:', err); });
+}).catch(err => {
+  console.error('Firebase auth error:', err);
+  document.getElementById('loadingScreen').innerHTML = `
+    <div class="modal" style="text-align:center">
+      <h2>Prode Mundial 2026</h2>
+      <p style="color:#f85149">Error de conexión: ${err.message}</p>
+      <p class="muted" style="font-size:12px">Si ves "auth/operation-not-allowed", activá <b>Anonymous</b> en Firebase Console → Authentication → Sign-in method.</p>
+    </div>`;
+});
 
 /* ============ HASH ============ */
 function rndSalt(){return Math.random().toString(36).slice(2,10)}
@@ -841,8 +849,8 @@ function renderPredEsp(p){
   const opts = code=>`<option value="">—</option>` + Object.keys(TEAMS).map(c=>`<option value="${c}" ${sp[code]===c?'selected':''}>${TEAMS[c].n}</option>`).join('');
   const optsK = key=>`<option value="">—</option>` + Object.keys(TEAMS).map(c=>`<option value="${c}" ${sp[key]===c?'selected':''}>${TEAMS[c].n}</option>`).join('');
   let h = '';
-  h += locked ? `<div class="lock">🔒 Especiales cerradas (deadline 10 jun 22:00 ART)</div>`
-              : `<div class="warn-banner">⏰ Cierre: 10 jun 22:00 ART · ${fmtCountdown(cd)} restantes</div>`;
+  h += locked ? `<div class="lock">🔒 Especiales cerradas (deadline 11 jun 15:00 ART)</div>`
+              : `<div class="warn-banner">⏰ Cierre: 11 jun 15:00 ART · ${fmtCountdown(cd)} restantes</div>`;
   h += `<div class="card">
     <h2>Predicciones especiales</h2>
     <div class="grid2">
@@ -944,7 +952,7 @@ function renderPredGrp(p){
   const cd = DEADLINE_GRP_MS - Date.now();
   let h = locked
     ? `<div class="lock">🔒 Grupos cerrados</div>`
-    : `<div class="warn-banner">⏰ Cierre: 10 jun 22:00 ART · ${fmtCountdown(cd)} restantes</div>`;
+    : `<div class="warn-banner">⏰ Cierre: 11 jun 15:00 ART · ${fmtCountdown(cd)} restantes</div>`;
   h += `<div class="legend"><span><span class="dot" style="background:var(--pred)"></span>Tu predicción</span><span><span class="dot" style="background:var(--real)"></span>Resultado real</span></div>`;
   GROUP_LETTERS.forEach(grp=>{
     const stPred = calcStandings(grp, predSrc(currentUser));
@@ -1619,4 +1627,3 @@ document.getElementById('loginPwd').addEventListener('keydown',e=>{if(e.key==='E
 </script>
 </body>
 </html>
-
