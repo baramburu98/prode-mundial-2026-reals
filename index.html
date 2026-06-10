@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --panel2:#1f2630; --line:#2d333b;
@@ -400,11 +401,13 @@ function checkInit(){
 // Los listeners SIEMPRE actualizan local state. Re-render automático solo
 // en init. Después, cada interacción del usuario (tab nav, botones) re-renderiza
 // con datos frescos. Esto preserva el focus mientras se tipea inputs.
-db.ref('users').on('value', snap=>{ users = snap.val()||{}; normalizeState(); dataReady.users=true; checkInit(); });
-db.ref('preds').on('value', snap=>{ preds = snap.val()||{}; normalizeState(); dataReady.preds=true; checkInit(); });
-db.ref('real').on('value', snap=>{ const v=snap.val(); real = v||{m:{},t3:{},phase:'groups',koClosed:false}; normalizeState(); dataReady.real=true; checkInit(); });
-db.ref('realSp').on('value', snap=>{ realSp = snap.val()||{}; dataReady.realSp=true; checkInit(); });
-db.ref('realGoals').on('value', snap=>{ realGoals = snap.val()||{pg:{}}; if(!realGoals.pg) realGoals.pg={}; dataReady.realGoals=true; checkInit(); });
+firebase.auth().signInAnonymously().then(() => {
+  db.ref('users').on('value', snap=>{ users = snap.val()||{}; normalizeState(); dataReady.users=true; checkInit(); });
+  db.ref('preds').on('value', snap=>{ preds = snap.val()||{}; normalizeState(); dataReady.preds=true; checkInit(); });
+  db.ref('real').on('value', snap=>{ const v=snap.val(); real = v||{m:{},t3:{},phase:'groups',koClosed:false}; normalizeState(); dataReady.real=true; checkInit(); });
+  db.ref('realSp').on('value', snap=>{ realSp = snap.val()||{}; dataReady.realSp=true; checkInit(); });
+  db.ref('realGoals').on('value', snap=>{ realGoals = snap.val()||{pg:{}}; if(!realGoals.pg) realGoals.pg={}; dataReady.realGoals=true; checkInit(); });
+}).catch(err => { console.error('Firebase auth error:', err); });
 
 /* ============ HASH ============ */
 function rndSalt(){return Math.random().toString(36).slice(2,10)}
@@ -1616,3 +1619,4 @@ document.getElementById('loginPwd').addEventListener('keydown',e=>{if(e.key==='E
 </script>
 </body>
 </html>
+
