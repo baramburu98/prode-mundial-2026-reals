@@ -434,10 +434,19 @@ function normalizeName(s){
     .replace(/[^a-z0-9\s]/g,'').trim();
 }
 function nameWords(s){ return normalizeName(s).split(/\s+/).filter(w=>w.length>0); }
+function wordsClose(a,b){
+  // Same word, OR share a prefix of length >= min(len)-1 (handles 1-char typos at end)
+  if(a===b) return true;
+  const minLen=Math.min(a.length,b.length);
+  if(minLen<4) return false;
+  const prefixNeeded=minLen-1;
+  let common=0; for(let i=0;i<minLen;i++){if(a[i]===b[i])common++;else break;}
+  return common>=prefixNeeded;
+}
 function namesMatch(a,b){
   if(!a||!b) return false;
   const wa=nameWords(a), wb=nameWords(b);
-  return wa.some(w=>wb.includes(w));
+  return wa.some(wa_w=>wb.some(wb_w=>wordsClose(wa_w,wb_w)));
 }
 function findMatchingGoals(playerName, pgGoals){
   if(!playerName) return 0;
