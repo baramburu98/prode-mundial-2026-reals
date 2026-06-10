@@ -427,6 +427,26 @@ function hashPwd(pwd,salt){
   return h.toString(16).padStart(8,'0');
 }
 
+/* ============ NAME MATCHING ============ */
+function normalizeName(s){
+  return s.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9\s]/g,'').trim();
+}
+function nameWords(s){ return normalizeName(s).split(/\s+/).filter(w=>w.length>0); }
+function namesMatch(a,b){
+  if(!a||!b) return false;
+  const wa=nameWords(a), wb=nameWords(b);
+  return wa.some(w=>wb.includes(w));
+}
+function findMatchingGoals(playerName, pgGoals){
+  if(!playerName) return 0;
+  for(const key of Object.keys(pgGoals||{})){
+    if(namesMatch(playerName,key)) return pgGoals[key]||0;
+  }
+  return 0;
+}
+
 /* ============ LOGIN ============ */
 function showLogin(){document.getElementById('login').style.display='flex';resetLogin()}
 function resetLogin(){
@@ -703,11 +723,11 @@ function calcBreakdown(name){
   // 5 - goleador, 3 - masGoleador, 3 - masGoleado, 3 - masExpulsados
   // 10 - lesionado, 15 - campeón, 10 - subcampeón, 5 - tercero
   const sp = p.sp||{}, rsp = realSp||{};
-  if(sp.goleador && rsp.goleador && sp.goleador.trim().toLowerCase()===rsp.goleador.trim().toLowerCase()) b.esp+=5;
+  if(sp.goleador && rsp.goleador && namesMatch(sp.goleador, rsp.goleador)) b.esp+=5;
   if(sp.masGoleador && rsp.masGoleador && sp.masGoleador===rsp.masGoleador) b.esp+=3;
   if(sp.masGoleado && rsp.masGoleado && sp.masGoleado===rsp.masGoleado) b.esp+=3;
   if(sp.masExpulsados && rsp.masExpulsados && sp.masExpulsados===rsp.masExpulsados) b.esp+=3;
-  if(sp.lesionado && rsp.lesionado && sp.lesionado.trim().toLowerCase()===rsp.lesionado.trim().toLowerCase()) b.esp+=10;
+  if(sp.lesionado && rsp.lesionado && namesMatch(sp.lesionado, rsp.lesionado)) b.esp+=10;
   if(sp.campeon && rsp.campeon && sp.campeon===rsp.campeon) b.esp+=15;
   if(sp.subcampeon && rsp.subcampeon && sp.subcampeon===rsp.subcampeon) b.esp+=10;
   if(sp.tercero && rsp.tercero && sp.tercero===rsp.tercero) b.esp+=5;
@@ -715,7 +735,7 @@ function calcBreakdown(name){
   const pgRealGoals = (realGoals.pg)||{};
   (p.pg||[]).forEach(player=>{
     if(!player) return;
-    const g = pgRealGoals[player.trim()];
+    const g = findMatchingGoals(player, pgRealGoals);
     if(g) b.esp += g;
   });
   // TRIVIA NUMÉRICA: 5 preguntas x 5pts. Los que estén más cerca del valor real se llevan los 5.
@@ -1349,13 +1369,13 @@ function renderAdminPlayerSlot(key,desc,showGoals){
     const v = (preds[name].sp||{})[key];
     if(v){(players[v.trim().toLowerCase()]=players[v.trim().toLowerCase()]||{display:v.trim(),users:[]}).users.push(name)}
   });
-  const matched = realSp[key]?realSp[key].trim().toLowerCase():null;
+  const matched = realSp[key]?realSp[key]:null;
   let h = `<div class="card"><h3>Quién eligió a quién — ${key}</h3>
     <p class="muted" style="font-size:12px">${desc}</p>`;
   if(Object.keys(players).length===0){h+=`<p class="muted">Nadie eligió todavía.</p></div>`;return h}
   h += `<table><thead><tr><th>Jugador</th><th style="text-align:left">Participantes</th><th>${key==='goleador'?'Pts (5)':'Pts (10)'}</th></tr></thead><tbody>`;
   Object.entries(players).forEach(([k,v])=>{
-    const hit = matched && k===matched;
+    const hit = matched && namesMatch(k, matched);
     h += `<tr><td><b>${v.display}</b>${hit?' ✓':''}</td><td style="text-align:left">${v.users.join(', ')}</td><td>${hit?(key==='goleador'?5:10):0}</td></tr>`;
   });
   h += `</tbody></table></div>`;
