@@ -1381,6 +1381,20 @@ function renderAdminPlayerSlot(key,desc,showGoals){
   h += `</tbody></table></div>`;
   return h;
 }
+function groupSimilarPlayers(playerMap){
+  const groups=[];
+  for(const [pl,data] of Object.entries(playerMap)){
+    let found=false;
+    for(const group of groups){
+      if(group.keys.some(k=>namesMatch(k,pl))){
+        group.keys.push(pl); group.users.push(...data.users); found=true; break;
+      }
+    }
+    if(!found) groups.push({keys:[pl],users:[...data.users]});
+  }
+  groups.forEach(g=>{g.canonical=g.keys.reduce((a,b)=>a.length>=b.length?a:b);});
+  return groups;
+}
 function renderAdminPgTable(){
   const players = {};
   Object.keys(preds).forEach(name=>{
@@ -1388,9 +1402,19 @@ function renderAdminPgTable(){
   });
   if(Object.keys(players).length===0) return `<p class="muted">Nadie eligió todavía.</p>`;
   if(!realGoals.pg) realGoals.pg={};
-  let h = `<table><thead><tr><th>Jugador</th><th style="text-align:left">Elegido por</th><th>Goles</th></tr></thead><tbody>`;
-  Object.entries(players).forEach(([pl,v])=>{
-    h += `<tr><td><b>${pl}</b></td><td style="text-align:left">${v.users.join(', ')}</td><td><input type="number" min="0" max="50" value="${realGoals.pg[pl]??0}" onchange="setPgGoals('${pl.replace(/'/g,"\\'")}',this.value)" style="width:60px"></td></tr>`;
+  const groups=groupSimilarPlayers(players);
+  let h = `<table><thead><tr><th>Jugador</th><th style="text-align:left">Variantes · Elegido por</th><th>Goles</th></tr></thead><tbody>`;
+  groups.forEach(g=>{
+    const canon=g.canonical;
+    const variants=g.keys.filter(k=>k!==canon);
+    const variantStr=variants.length?`<div style="font-size:11px;color:var(--mute);margin-top:2px">también: ${variants.join(', ')}</div>`:'';
+    const users=[...new Set(g.users)];
+    const storedGoals=findMatchingGoals(canon,realGoals.pg);
+    h += `<tr>
+      <td><b>${canon}</b>${variantStr}</td>
+      <td style="text-align:left">${users.join(', ')}</td>
+      <td><input type="number" min="0" max="50" value="${storedGoals}" onchange="setPgGoals('${canon.replace(/'/g,"\\'")}',this.value)" style="width:60px"></td>
+    </tr>`;
   });
   h += `</tbody></table>`;
   return h;
