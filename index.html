@@ -123,6 +123,8 @@ tr.third td{color:var(--warn)}
 .statlabel{font-size:12px;color:var(--mute);margin-bottom:4px}
 .statval{font-size:26px;font-weight:800;color:var(--acc2);line-height:1}
 .statsub{font-size:11px;color:var(--mute);margin-top:6px}
+.statbar{height:6px;background:var(--bg);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:6px 0 4px 0}
+.statbarfill{height:100%;background:var(--acc2);border-radius:4px}
 </style>
 </head>
 <body>
@@ -1070,6 +1072,9 @@ function computeRealTotals(){
 function renderTotalsCounters(p){
   const sp = p.sp||{};
   const t = computeRealTotals();
+  const totalM = MATCHES.length;
+  const playedM = MATCHES.filter(m=>{const r=real.m[m.id];return r&&r.h!=null&&r.a!=null;}).length;
+  const playedPct = Math.round(playedM/totalM*100);
   const defs = [
     ['goals','⚽ Goles', t.goals, sp.trivGoals],
     ['yellow','🟨 Amarillas', t.yellow, sp.trivAmar],
@@ -1078,16 +1083,31 @@ function renderTotalsCounters(p){
     ['penalties','🎯 Penales', t.penalties, sp.trivPenales]
   ];
   let h = `<div class="card"><h2>Totales del torneo (en vivo)</h2>
-    <p class="muted" style="font-size:12px;margin:0 0 10px 0">Total real acumulado hasta ahora vs tu predicción de la trivia. Los goles se calculan de los marcadores; amarillas, rojas, córners y penales se sincronizan desde la API.</p>
+    <p class="muted" style="font-size:12px;margin:0 0 10px 0">Total real acumulado vs tu predicción de la trivia. La barra verde muestra cuánto del total que predijiste ya se alcanzó (naranja = ya se pasó).</p>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute);margin-bottom:4px"><span>Partidos jugados</span><span><b style="color:var(--text)">${playedM}/${totalM}</b> · ${playedPct}%</span></div>
+      <div class="statbar"><div class="statbarfill" style="width:${playedPct}%;background:var(--acc)"></div></div>
+    </div>
     <div class="statgrid">`;
   defs.forEach(([k,label,rv,mine])=>{
     const has = rv!=null;
     const hasMine = mine!=null && mine!=='';
-    const diff = (has&&hasMine)?(mine-rv):null;
+    const pct = (has&&hasMine&&mine>0) ? Math.round(rv/mine*100) : (has&&hasMine&&mine==0 ? (rv>0?999:0) : null);
+    const remaining = (has&&hasMine) ? (mine-rv) : null;
+    let sub;
+    if(!hasMine) sub = `obj: <span class="muted">—</span>`;
+    else if(!has) sub = `obj: <b>${mine}</b>`;
+    else {
+      const remTxt = remaining>0 ? `faltan ${remaining}` : (remaining===0?'¡justo! 🎯':`+${-remaining} de más`);
+      sub = `obj: <b>${mine}</b> · ${pct}% · ${remTxt}`;
+    }
+    const over = (pct!=null && pct>100);
+    const barW = (pct==null)?0:Math.min(100,pct);
     h += `<div class="statcard">
       <div class="statlabel">${label}</div>
       <div class="statval">${has?rv:'<span class="muted" style="font-size:16px">—</span>'}</div>
-      <div class="statsub">tu trivia: <b>${hasMine?mine:'—'}</b>${diff!=null?` · <span style="color:${diff===0?'var(--acc2)':'var(--mute)'}">Δ ${diff>0?'+':''}${diff}</span>`:''}</div>
+      <div class="statbar"><div class="statbarfill" style="width:${barW}%;background:${over?'var(--warn)':'var(--acc2)'}"></div></div>
+      <div class="statsub">${sub}</div>
     </div>`;
   });
   h += `</div></div>`;
