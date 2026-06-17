@@ -117,6 +117,12 @@ tr.third td{color:var(--warn)}
 .tag.pred{color:var(--pred);border-color:var(--pred)}
 .warn-banner{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);color:var(--warn);padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px}
 .day-header{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px 0;font-weight:600;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.statgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media (max-width:760px){.statgrid{grid-template-columns:repeat(2,1fr)}}
+.statcard{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+.statlabel{font-size:12px;color:var(--mute);margin-bottom:4px}
+.statval{font-size:26px;font-weight:800;color:var(--acc2);line-height:1}
+.statsub{font-size:11px;color:var(--mute);margin-top:6px}
 </style>
 </head>
 <body>
@@ -158,6 +164,7 @@ tr.third td{color:var(--warn)}
   <button data-tab="pred" class="on">Mis Predicciones</button>
   <button data-tab="fixture">Fixture</button>
   <button data-tab="groups">Grupos</button>
+  <button data-tab="goleadores">Goleadores</button>
   <button data-tab="ranking">Ranking</button>
   <button data-tab="admin">Admin</button>
 </nav>
@@ -166,6 +173,7 @@ tr.third td{color:var(--warn)}
   <div id="tab-pred"></div>
   <div id="tab-fixture" style="display:none"></div>
   <div id="tab-groups" style="display:none"></div>
+  <div id="tab-goleadores" style="display:none"></div>
   <div id="tab-ranking" style="display:none"></div>
   <div id="tab-admin" style="display:none"></div>
 </main>
@@ -334,6 +342,8 @@ let preds = {};
 let real  = {m:{},t3:{},phase:'groups',koClosed:false};
 let realSp= {};
 let realGoals = {pg:{}};
+let realStats = {};
+let realScorers = {};
 // La sesión (qué usuario está logueado en este dispositivo) sigue en localStorage
 let currentUser = (()=>{try{return JSON.parse(localStorage.getItem('pr26c_cur'))||null}catch(e){return null}})();
 
@@ -348,6 +358,8 @@ function normalizeState(){
   if(!real.phase) real.phase = 'groups';
   if(real.koClosed==null) real.koClosed = false;
   if(!realGoals.pg) realGoals.pg = {};
+  if(!realStats || typeof realStats !== 'object' || Array.isArray(realStats)) realStats = {};
+  if(!realScorers || typeof realScorers !== 'object' || Array.isArray(realScorers)) realScorers = {};
   Object.keys(preds).forEach(name=>{
     const old = preds[name];
     if(!old || typeof old !== 'object' || Array.isArray(old)){ preds[name] = {m:{},sp:{},pg:['','',''],t3:{}}; return; }
@@ -382,7 +394,7 @@ function clearAll(){return Promise.all([db.ref('users').remove(), db.ref('preds'
 function saveAll(){saveSession()}
 
 /* ----- Firebase listeners (real-time sync) ----- */
-let dataReady = {users:false, preds:false, real:false, realSp:false, realGoals:false};
+let dataReady = {users:false, preds:false, real:false, realSp:false, realGoals:false, realStats:false, realScorers:false};
 let uiInitialized = false;
 function checkInit(){
   if(uiInitialized) return;
@@ -407,6 +419,8 @@ firebase.auth().signInAnonymously().then(() => {
   db.ref('real').on('value', snap=>{ const v=snap.val(); real = v||{m:{},t3:{},phase:'groups',koClosed:false}; normalizeState(); dataReady.real=true; checkInit(); });
   db.ref('realSp').on('value', snap=>{ realSp = snap.val()||{}; dataReady.realSp=true; checkInit(); });
   db.ref('realGoals').on('value', snap=>{ realGoals = snap.val()||{pg:{}}; if(!realGoals.pg) realGoals.pg={}; dataReady.realGoals=true; checkInit(); });
+  db.ref('realStats').on('value', snap=>{ realStats = snap.val()||{}; dataReady.realStats=true; checkInit(); });
+  db.ref('realScorers').on('value', snap=>{ realScorers = snap.val()||{}; dataReady.realScorers=true; checkInit(); });
 }).catch(err => {
   console.error('Firebase auth error:', err);
   document.getElementById('loadingScreen').innerHTML = `
@@ -844,7 +858,7 @@ document.querySelectorAll('#tabs button').forEach(b=>{
   b.onclick=()=>{activeTab=b.dataset.tab; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b)); render()}
 });
 function showOnly(id){
-  ['tab-pred','tab-fixture','tab-groups','tab-ranking','tab-admin'].forEach(t=>{document.getElementById(t).style.display = (t===id?'block':'none')});
+  ['tab-pred','tab-fixture','tab-groups','tab-goleadores','tab-ranking','tab-admin'].forEach(t=>{document.getElementById(t).style.display = (t===id?'block':'none')});
 }
 function render(){
   if(!currentUser){showLogin();return}
@@ -853,6 +867,7 @@ function render(){
   if(activeTab==='pred') renderPred();
   if(activeTab==='fixture') renderFixture();
   if(activeTab==='groups') renderGroups();
+  if(activeTab==='goleadores') renderGoleadores();
   if(activeTab==='ranking') renderRanking();
   if(activeTab==='admin') renderAdmin();
 }
@@ -864,6 +879,7 @@ function renderPred(){
   const p = preds[me];
   const subs = [['esp','Especiales'],['grp','Grupos'],['ko','Eliminatoria']];
   let html = `<nav class="subtabs">${subs.map(([k,n])=>`<button class="${k===activeSub?'on':''}" onclick="setSub('${k}')">${n}</button>`).join('')}</nav>`;
+  html += renderTotalsCounters(p);
   if(activeSub==='esp') html += renderPredEsp(p);
   if(activeSub==='grp') html += renderPredGrp(p);
   if(activeSub==='ko')  html += renderPredKO(p);
@@ -983,12 +999,23 @@ function renderPredGrp(p){
     ? `<div class="lock">🔒 Grupos cerrados</div>`
     : `<div class="warn-banner">⏰ Cierre: 11 jun 16:40 ART · ${fmtCountdown(cd)} restantes</div>`;
   h += `<div class="legend"><span><span class="dot" style="background:var(--pred)"></span>Tu predicción</span><span><span class="dot" style="background:var(--real)"></span>Resultado real</span></div>`;
+  // ---- PARTIDOS EN ORDEN CRONOLÓGICO ----
+  const grpMatches = MATCHES.filter(m=>m.grp).slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)||a.id-b.id);
+  let lastDate=null;
+  h += `<div class="card" style="padding:6px 12px">`;
+  grpMatches.forEach(m=>{
+    if(m.date!==lastDate){ h += `<div class="day-header">${fmtDate(m.date)} · ${m.date}</div>`; lastDate=m.date; }
+    h += renderPredMatchRowChrono(m, locked);
+  });
+  h += `</div>`;
+  // ---- TABLAS POR GRUPO (al final) ----
+  h += `<div class="section" style="margin-top:18px"><h2>Tablas por grupo · tu tabla vs real</h2></div>`;
+  h += `<div class="grid2">`;
   GROUP_LETTERS.forEach(grp=>{
     const stPred = calcStandings(grp, predSrc(currentUser));
     const stReal = calcStandings(grp, realSrc);
     const anyReal = MATCHES.filter(m=>m.grp===grp).some(m=>realSrc(m.id));
     const realDone = MATCHES.filter(m=>m.grp===grp).every(m=>realSrc(m.id));
-    // Posiciones bonus
     let posBadge = '';
     if(realDone){
       let bonus = 0, parts=[];
@@ -1004,23 +1031,65 @@ function renderPredGrp(p){
         : `<div style="font-size:12px;color:var(--mute);margin-top:8px">Posiciones: ${parts.length?'acertaste '+parts.join(', ')+' (necesitás 1°+2° para bonus)':'sin coincidencias con tabla real'}</div>`;
     }
     h += `<div class="card"><h2>Grupo ${grp}</h2>`;
-    h += `<div class="grid2">`;
-    // matches
-    h += `<div>`;
-    MATCHES.filter(m=>m.grp===grp).forEach(m=>{
-      h += renderPredMatchRow(m, locked);
-    });
-    h += `</div>`;
-    // standings
-    h += `<div>`;
     h += `<div class="standings-pair">`;
     h += `<div class="col pred"><h5>Tu tabla</h5><div id="std-pred-${grp}">${renderStandingsTable(stPred)}</div></div>`;
     if(anyReal) h += `<div class="col real"><h5>Tabla real</h5><div id="std-real-${grp}">${renderStandingsTable(stReal)}</div></div>`;
     h += `</div>`;
     h += posBadge;
     h += `</div>`;
-    h += `</div></div>`;
   });
+  h += `</div>`;
+  return h;
+}
+function renderPredMatchRowChrono(m, locked){
+  const me = currentUser;
+  const pr = (preds[me]&&preds[me].m&&preds[me].m[m.id])||{};
+  const rr = real.m[m.id];
+  const cls = rr&&rr.h!=null ? 'match real' : 'match';
+  const pts = matchPoints(me, m.id);
+  return `<div class="${cls}">
+    <div class="info">${m.time}<br>Grp ${m.grp}</div>
+    <div class="t"><img src="${flagUrl(m.t1)}" onerror="this.style.visibility='hidden'"><span>${teamName(m.t1)}</span></div>
+    <div class="score">
+      <input type="number" min="0" max="20" value="${pr.h??''}" ${locked?'disabled':''} oninput="setPred(${m.id},'h',this.value)">
+      <span>-</span>
+      <input type="number" min="0" max="20" value="${pr.a??''}" ${locked?'disabled':''} oninput="setPred(${m.id},'a',this.value)">
+      ${rr&&rr.h!=null?`<span class="muted" style="margin-left:8px">(real ${rr.h}-${rr.a})</span>`:''}
+    </div>
+    <div class="t right"><span>${teamName(m.t2)}</span><img src="${flagUrl(m.t2)}" onerror="this.style.visibility='hidden'"></div>
+    <div class="pts" title="${pts?pts.detail:''}">${pts?'+'+pts.total:''}</div>
+  </div>`;
+}
+function computeRealTotals(){
+  let goals=0;
+  MATCHES.forEach(m=>{ const r=real.m[m.id]; if(r&&r.h!=null&&r.a!=null) goals+=r.h+r.a; });
+  const s = (realStats&&typeof realStats==='object')?realStats:{};
+  return { goals:goals, yellow:s.yellow, red:s.red, corners:s.corners, penalties:s.penalties };
+}
+function renderTotalsCounters(p){
+  const sp = p.sp||{};
+  const t = computeRealTotals();
+  const defs = [
+    ['goals','⚽ Goles', t.goals, sp.trivGoals],
+    ['yellow','🟨 Amarillas', t.yellow, sp.trivAmar],
+    ['red','🟥 Rojas', t.red, sp.trivRojas],
+    ['corners','🚩 Córners', t.corners, sp.trivCorners],
+    ['penalties','🎯 Penales', t.penalties, sp.trivPenales]
+  ];
+  let h = `<div class="card"><h2>Totales del torneo (en vivo)</h2>
+    <p class="muted" style="font-size:12px;margin:0 0 10px 0">Total real acumulado hasta ahora vs tu predicción de la trivia. Los goles se calculan de los marcadores; amarillas, rojas, córners y penales se sincronizan desde la API.</p>
+    <div class="statgrid">`;
+  defs.forEach(([k,label,rv,mine])=>{
+    const has = rv!=null;
+    const hasMine = mine!=null && mine!=='';
+    const diff = (has&&hasMine)?(mine-rv):null;
+    h += `<div class="statcard">
+      <div class="statlabel">${label}</div>
+      <div class="statval">${has?rv:'<span class="muted" style="font-size:16px">—</span>'}</div>
+      <div class="statsub">tu trivia: <b>${hasMine?mine:'—'}</b>${diff!=null?` · <span style="color:${diff===0?'var(--acc2)':'var(--mute)'}">Δ ${diff>0?'+':''}${diff}</span>`:''}</div>
+    </div>`;
+  });
+  h += `</div></div>`;
   return h;
 }
 function renderPredMatchRow(m, locked){
@@ -1176,6 +1245,27 @@ function renderGroups(){
   document.getElementById('tab-groups').innerHTML = h;
 }
 
+/* ============ TAB: GOLEADORES ============ */
+function renderGoleadores(){
+  const sc = (realScorers&&typeof realScorers==='object')?realScorers:{};
+  const arr = Object.entries(sc).map(([name,info])=>{
+    if(typeof info==='number') return {name,goals:info,team:null,assists:null};
+    return {name, goals:(info.goals||0), team:(info.team||null), assists:(info.assists==null?null:info.assists)};
+  }).filter(x=>x.goals>0).sort((a,b)=>b.goals-a.goals||((b.assists||0)-(a.assists||0))||a.name.localeCompare(b.name));
+  const showA = arr.some(x=>x.assists!=null);
+  let h = `<div class="section"><h2>Goleadores</h2><p class="muted">Tabla de goleadores del torneo. Se actualiza automáticamente desde la API.</p></div>`;
+  if(arr.length===0){
+    h += `<div class="card"><p class="muted">Todavía no hay datos de goleadores. Se completan solos cuando el sync esté activo y haya goles registrados.</p></div>`;
+  } else {
+    const teamCell = c => c ? (TEAMS[c]?`${flagImg(c,14)} ${teamName(c)}`:c) : '<span class="muted">—</span>';
+    h += `<div class="card"><table><thead><tr><th>#</th><th style="text-align:left">Jugador</th><th style="text-align:left">Equipo</th><th>Goles</th>${showA?'<th>Asist.</th>':''}</tr></thead><tbody>`;
+    arr.forEach((r,i)=>{
+      h += `<tr class="${['first','second','third',''][i]||''}"><td>${i+1}</td><td style="text-align:left"><b>${r.name}</b></td><td style="text-align:left">${teamCell(r.team)}</td><td>${r.goals}</td>${showA?`<td>${r.assists==null?'':r.assists}</td>`:''}</tr>`;
+    });
+    h += `</tbody></table></div>`;
+  }
+  document.getElementById('tab-goleadores').innerHTML = h;
+}
 /* ============ TAB: RANKING ============ */
 function renderRanking(){
   const names = Object.keys(users);
