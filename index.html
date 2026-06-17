@@ -387,6 +387,7 @@ function saveRealPhase(){return db.ref('real/phase').set(real.phase)}
 function saveRealKoClosed(){return db.ref('real/koClosed').set(real.koClosed)}
 function saveRealSp(){return db.ref('realSp').set(realSp)}
 function saveRealGoals(){return db.ref('realGoals').set(realGoals)}
+function saveRealStats(){return db.ref('realStats').set(realStats)}
 function deleteUser(name){return Promise.all([db.ref('users/'+name).remove(), db.ref('preds/'+name).remove()])}
 function clearReal(){return Promise.all([db.ref('real').set({m:{},t3:{},phase:'groups',koClosed:false}), db.ref('realSp').remove(), db.ref('realGoals').remove()])}
 function clearAll(){return Promise.all([db.ref('users').remove(), db.ref('preds').remove(), db.ref('real').set({m:{},t3:{},phase:'groups',koClosed:false}), db.ref('realSp').remove(), db.ref('realGoals').remove()])}
@@ -1414,6 +1415,16 @@ function renderAdminEsp(){
     h += `<div class="row"><label>${label}:</label><input type="number" min="0" step="1" id="rtriv_${k}" value="${v}" style="width:120px" oninput="setRealTriv('${k}',this.value)"></div>`;
   });
   h += `</div></div>`;
+  // ----- Totales en vivo (manual): alimentan el contador de Mis Predicciones -----
+  const liveLabels = {yellow:'Amarillas',red:'Rojas',corners:'Córners',penalties:'Penales (sin tandas)'};
+  h += `<div class="card"><h3>Totales en vivo (manual)</h3>
+    <p class="muted" style="font-size:12px">Estos números alimentan el contador <b>Totales del torneo</b> que ven los participantes en Mis Predicciones. Los goles se calculan solos de los marcadores; estos cuatro los actualizás vos a mano cuando quieras. (Al cierre, copiá los finales en la Trivia numérica de arriba para que puntúe.)</p>
+    <div class="grid2">`;
+  Object.entries(liveLabels).forEach(([k,label])=>{
+    const v = (realStats&&realStats[k]!=null)?realStats[k]:'';
+    h += `<div class="row"><label>${label}:</label><input type="number" min="0" step="1" id="rstat_${k}" value="${v}" style="width:120px" oninput="setRealStat('${k}',this.value)"></div>`;
+  });
+  h += `</div></div>`;
   // Tabla comparativa de respuestas
   const names = Object.keys(users).sort();
   if(names.length>0){
@@ -1461,6 +1472,10 @@ function renderAdminEsp(){
 function setRealTriv(k, v){
   realSp[k] = v===''?null:parseInt(v);
   debounceWrite('realSp', saveRealSp);
+}
+function setRealStat(k, v){
+  realStats[k] = v===''?null:parseInt(v);
+  debounceWrite('realStats', saveRealStats);
 }
 function renderAdminPlayerSlot(key,desc,showGoals){
   const players = {};
