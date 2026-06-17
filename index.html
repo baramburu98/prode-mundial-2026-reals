@@ -463,7 +463,12 @@ function wordsClose(a,b){
 function namesMatch(a,b){
   if(!a||!b) return false;
   const wa=nameWords(a), wb=nameWords(b);
-  return wa.some(wa_w=>wb.some(wb_w=>wordsClose(wa_w,wb_w)));
+  if(!wa.length||!wb.length) return false;
+  // Estricto: TODAS las palabras del nombre más corto deben aparecer en el más
+  // largo (evita matchear por el solo nombre de pila, ej. dos "Julián" distintos).
+  const short = wa.length<=wb.length?wa:wb;
+  const long  = wa.length<=wb.length?wb:wa;
+  return short.every(sw=>long.some(lw=>wordsClose(sw,lw)));
 }
 function findMatchingGoals(playerName, pgGoals){
   if(!playerName) return 0;
