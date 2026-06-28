@@ -325,6 +325,9 @@ const STAGE_LABEL = {R32:'Ronda 32',R16:'Octavos',QF:'Cuartos',SF:'Semifinal',TP
 
 const DEADLINE_GRP_MS = Date.parse('2026-06-11T19:40:00Z'); // 11 jun 16:40 ART
 const DEADLINE_KO_MS  = Date.parse('2026-06-28T16:00:00Z'); // 28 jun 13:00 ART
+// Cierres individuales de partidos de eliminatoria (5 min antes del inicio). Timestamps en UTC.
+const KO_LOCKS = { 73: Date.parse('2026-06-28T18:55:00Z') }; // M73 Sudáfrica-Canadá: cierra 15:55 ART (arranca 16:00)
+function isMatchTimeLocked(id){ return KO_LOCKS[id]!=null && Date.now() >= KO_LOCKS[id]; }
 
 /* ============ STATE & FIREBASE ============ */
 const firebaseConfig = {
@@ -763,27 +766,27 @@ function renderRealMulti(key,label){
 function addRealMulti(key,code){ if(!code) return; const arr=realMultiArr(key); if(arr.indexOf(code)<0){ arr.push(code); realSp[key]=arr; saveRealSp(); render(); } }
 function removeRealMulti(key,code){ realSp[key]=realMultiArr(key).filter(c=>c!==code); saveRealSp(); render(); }
 function calcBreakdown(name){
-  const b = {esp:0,grp:0,r32:0,r16:0,qf:0,sf:0,fin:0};
+  const b = {esp:0,espPG:0,espRest:0,grp:0,grpM:0,grpP:0,r32:0,r16:0,qf:0,sf:0,fin:0};
   const p = preds[name];
   if(!p) return b;
   // ---- ESPECIALES ----
   // 5 - goleador, 3 - masGoleador, 3 - masGoleado, 3 - masExpulsados
   // 10 - lesionado, 15 - campeón, 10 - subcampeón, 5 - tercero
   const sp = p.sp||{}, rsp = realSp||{};
-  if(sp.goleador && rsp.goleador && namesMatch(sp.goleador, rsp.goleador)) b.esp+=5;
-  if(sp.masGoleador && inRealSet(sp.masGoleador, rsp.masGoleador)) b.esp+=3;
-  if(sp.masGoleado && inRealSet(sp.masGoleado, rsp.masGoleado)) b.esp+=3;
-  if(sp.masExpulsados && inRealSet(sp.masExpulsados, rsp.masExpulsados)) b.esp+=3;
-  if(sp.lesionado && rsp.lesionado && namesMatch(sp.lesionado, rsp.lesionado)) b.esp+=10;
-  if(sp.campeon && rsp.campeon && sp.campeon===rsp.campeon) b.esp+=15;
-  if(sp.subcampeon && rsp.subcampeon && sp.subcampeon===rsp.subcampeon) b.esp+=10;
-  if(sp.tercero && rsp.tercero && sp.tercero===rsp.tercero) b.esp+=5;
+  if(sp.goleador && rsp.goleador && namesMatch(sp.goleador, rsp.goleador)) b.espRest+=5;
+  if(sp.masGoleador && inRealSet(sp.masGoleador, rsp.masGoleador)) b.espRest+=3;
+  if(sp.masGoleado && inRealSet(sp.masGoleado, rsp.masGoleado)) b.espRest+=3;
+  if(sp.masExpulsados && inRealSet(sp.masExpulsados, rsp.masExpulsados)) b.espRest+=3;
+  if(sp.lesionado && rsp.lesionado && namesMatch(sp.lesionado, rsp.lesionado)) b.espRest+=10;
+  if(sp.campeon && rsp.campeon && sp.campeon===rsp.campeon) b.espRest+=15;
+  if(sp.subcampeon && rsp.subcampeon && sp.subcampeon===rsp.subcampeon) b.espRest+=10;
+  if(sp.tercero && rsp.tercero && sp.tercero===rsp.tercero) b.espRest+=5;
   // PUNTO GOL: 1pt by each goal scored by chosen player (×3 slots)
   const pgRealGoals = (realGoals.pg)||{};
   (p.pg||[]).forEach(player=>{
     if(!player) return;
     const g = findMatchingGoals(player, pgRealGoals);
-    if(g) b.esp += g;
+    if(g) b.espPG += g;
   });
   // TRIVIA NUMÉRICA: 5 preguntas x 5pts. Los que estén más cerca del valor real se llevan los 5.
   // Si hay empate en distancia mínima, los 5pts se reparten en partes iguales.
@@ -802,16 +805,17 @@ function calcBreakdown(name){
       else if(d===minDist){ winnerCount++; }
     });
     const myDist = Math.abs(parseFloat(myVal) - parseFloat(realVal));
-    if(myDist===minDist && winnerCount>0) b.esp += 5/winnerCount;
+    if(myDist===minDist && winnerCount>0) b.espRest += 5/winnerCount;
   });
+  b.esp = b.espPG + b.espRest;
   // ---- GROUPS ----
   GROUP_LETTERS.forEach(grp=>{
     MATCHES.filter(m=>m.grp===grp).forEach(m=>{
       const pr = p.m && p.m[m.id];
       const rr = real.m[m.id];
       if(!pr||pr.h==null||pr.a==null||!rr||rr.h==null||rr.a==null) return;
-      if(pr.h===rr.h && pr.a===rr.a) b.grp+=3;
-      else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b.grp+=1;
+      if(pr.h===rr.h && pr.a===rr.a) b.grpM+=3;
+      else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b.grpM+=1;
     });
     // positions bonus: +3 if predicted 1st and 2nd match real 1st/2nd; +1 extra if also 3rd
     const stReal = calcStandings(grp, realSrc);
@@ -820,11 +824,12 @@ function calcBreakdown(name){
     const predDone = MATCHES.filter(m=>m.grp===grp).every(m=>predSrc(name)(m.id));
     if(realDone && predDone){
       if(stReal[0].t===stPred[0].t && stReal[1].t===stPred[1].t){
-        b.grp+=3;
-        if(stReal[2].t===stPred[2].t) b.grp+=1;
+        b.grpP+=3;
+        if(stReal[2].t===stPred[2].t) b.grpP+=1;
       }
     }
   });
+  b.grp = b.grpM + b.grpP;
   // ---- R32 ----
   MATCHES.filter(m=>m.stg==='R32').forEach(m=>{
     const pr = p.m && p.m[m.id];
@@ -1195,7 +1200,7 @@ function renderPredKO(p){
   stages.forEach(stg=>{
     h += `<div class="card"><h2>${STAGE_LABEL[stg]}</h2>`;
     MATCHES.filter(m=>m.stg===stg).forEach(m=>{
-      h += renderPredKORow(m, lockedKO);
+      h += renderPredKORow(m, lockedKO || isMatchTimeLocked(m.id));
     });
     h += `</div>`;
   });
@@ -1227,8 +1232,9 @@ function renderPredKORow(m, locked){
   const showPens = (pr.h!=null && pr.a!=null && pr.h===pr.a);
   const cls = rr&&rr.h!=null ? 'match real' : 'match';
   const pts = matchPoints(me, m.id);
+  const timeLocked = isMatchTimeLocked(m.id);
   return `<div class="${cls}">
-    <div class="info">M${m.id}<br>${fmtDate(m.date)}</div>
+    <div class="info">M${m.id}<br>${fmtDate(m.date)}${timeLocked?'<br><span style="color:var(--warn)">🔒 cerrado</span>':''}</div>
     ${renderSlot(m.s1,t1)}
     <div class="score">
       <input type="number" min="0" max="20" value="${pr.h??''}" ${locked?'disabled':''} oninput="setPred(${m.id},'h',this.value)">
@@ -1319,11 +1325,11 @@ function renderRanking(){
   let h = `<div class="section"><h2>Ranking</h2></div>
     <div class="card">
     <table>
-      <thead><tr><th>#</th><th>Participante</th><th>Total</th><th>ESP</th><th>GRP</th><th>R32</th><th>OCT</th><th>CTO</th><th>SF</th><th>FIN</th></tr></thead>
+      <thead><tr><th>#</th><th>Participante</th><th>Total</th><th>P.Gol</th><th>Esp.</th><th>GRP part.</th><th>GRP 1/2/3</th><th>R32</th><th>OCT</th><th>CTO</th><th>SF</th><th>FIN</th></tr></thead>
       <tbody>${rows.map((r,i)=>`<tr ${r.name===currentUser?'style="background:rgba(88,166,255,.08)"':''}>
         <td>${i+1}</td><td><b>${r.name}</b></td>
         <td><b style="color:var(--acc2)">${fmtPts(r.tot)}</b></td>
-        <td>${fmtPts(r.esp)}</td><td>${r.grp}</td><td>${r.r32}</td><td>${r.r16}</td><td>${r.qf}</td><td>${r.sf}</td><td>${r.fin}</td>
+        <td>${fmtPts(r.espPG)}</td><td>${fmtPts(r.espRest)}</td><td>${r.grpM}</td><td>${r.grpP}</td><td>${r.r32}</td><td>${r.r16}</td><td>${r.qf}</td><td>${r.sf}</td><td>${r.fin}</td>
       </tr>`).join('')}</tbody>
     </table>
     ${rows.length===0?'<p class="muted" style="text-align:center;padding:20px">Todavía no hay participantes registrados.</p>':''}
@@ -1757,7 +1763,7 @@ function renderAdminPreds(){
     <div style="font-size:13px;color:var(--mute);margin-bottom:4px">Puntos totales:</div>
     <div style="font-size:22px;font-weight:800;color:var(--acc2)">${fmtPts(tot)}</div>
     <div style="font-size:11px;color:var(--mute);margin-top:4px">
-      ESP ${fmtPts(b.esp)} · GRP ${b.grp} · R32 ${b.r32} · OCT ${b.r16} · CTO ${b.qf} · SF ${b.sf} · FIN ${b.fin}
+      P.Gol ${fmtPts(b.espPG)} · Esp ${fmtPts(b.espRest)} · GRP ${b.grp} (part ${b.grpM}/pos ${b.grpP}) · R32 ${b.r32} · OCT ${b.r16} · CTO ${b.qf} · SF ${b.sf} · FIN ${b.fin}
     </div>
   </div>`;
   // Especiales
