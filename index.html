@@ -282,22 +282,22 @@ const MATCHES = [
   {id:71,date:'2026-06-27',time:'23:00',grp:'J',t1:'dz',t2:'at',v:'Kansas City'},
   {id:72,date:'2026-06-27',time:'23:00',grp:'J',t1:'jo',t2:'ar',v:'Dallas'},
   // R32
-  {id:73,date:'2026-06-28',time:'15:00',stg:'R32',s1:'2A',s2:'2B',v:'Los Ángeles'},
-  {id:74,date:'2026-06-29',time:'15:00',stg:'R32',s1:'1E',s2:'3:ABCDF',v:'Boston'},
-  {id:75,date:'2026-06-29',time:'15:00',stg:'R32',s1:'1F',s2:'2C',v:'Monterrey'},
-  {id:76,date:'2026-06-29',time:'15:00',stg:'R32',s1:'1C',s2:'2F',v:'Houston'},
-  {id:77,date:'2026-06-30',time:'15:00',stg:'R32',s1:'1I',s2:'3:CDFGH',v:'NY/NJ'},
-  {id:78,date:'2026-06-30',time:'15:00',stg:'R32',s1:'2E',s2:'2I',v:'Dallas'},
-  {id:79,date:'2026-06-30',time:'15:00',stg:'R32',s1:'1A',s2:'3:CEFHI',v:'Ciudad de México'},
-  {id:80,date:'2026-07-01',time:'15:00',stg:'R32',s1:'1L',s2:'3:EHIJK',v:'Atlanta'},
-  {id:81,date:'2026-07-01',time:'15:00',stg:'R32',s1:'1D',s2:'3:BEFIJ',v:'Bahía de SF'},
-  {id:82,date:'2026-07-01',time:'15:00',stg:'R32',s1:'1G',s2:'3:AEHIJ',v:'Seattle'},
-  {id:83,date:'2026-07-02',time:'15:00',stg:'R32',s1:'2K',s2:'2L',v:'Toronto'},
-  {id:84,date:'2026-07-02',time:'15:00',stg:'R32',s1:'1H',s2:'2J',v:'Los Ángeles'},
-  {id:85,date:'2026-07-02',time:'15:00',stg:'R32',s1:'1B',s2:'3:EFGIJ',v:'Vancouver'},
-  {id:86,date:'2026-07-03',time:'15:00',stg:'R32',s1:'1J',s2:'2H',v:'Miami'},
-  {id:87,date:'2026-07-03',time:'15:00',stg:'R32',s1:'1K',s2:'3:DEIJL',v:'Kansas City'},
-  {id:88,date:'2026-07-03',time:'15:00',stg:'R32',s1:'2D',s2:'2G',v:'Dallas'},
+  {id:73,date:'2026-06-28',time:'15:00',stg:'R32',s1:'za',s2:'ca',v:'Los Ángeles'},
+  {id:74,date:'2026-06-29',time:'15:00',stg:'R32',s1:'de',s2:'py',v:'Boston'},
+  {id:75,date:'2026-06-29',time:'15:00',stg:'R32',s1:'nl',s2:'ma',v:'Monterrey'},
+  {id:76,date:'2026-06-29',time:'15:00',stg:'R32',s1:'br',s2:'jp',v:'Houston'},
+  {id:77,date:'2026-06-30',time:'15:00',stg:'R32',s1:'fr',s2:'se',v:'NY/NJ'},
+  {id:78,date:'2026-06-30',time:'15:00',stg:'R32',s1:'ci',s2:'no',v:'Dallas'},
+  {id:79,date:'2026-06-30',time:'15:00',stg:'R32',s1:'mx',s2:'ec',v:'Ciudad de México'},
+  {id:80,date:'2026-07-01',time:'15:00',stg:'R32',s1:'eng',s2:'cd',v:'Atlanta'},
+  {id:81,date:'2026-07-01',time:'15:00',stg:'R32',s1:'us',s2:'ba',v:'Bahía de SF'},
+  {id:82,date:'2026-07-01',time:'15:00',stg:'R32',s1:'be',s2:'sn',v:'Seattle'},
+  {id:83,date:'2026-07-02',time:'15:00',stg:'R32',s1:'pt',s2:'hr',v:'Toronto'},
+  {id:84,date:'2026-07-02',time:'15:00',stg:'R32',s1:'es',s2:'at',v:'Los Ángeles'},
+  {id:85,date:'2026-07-02',time:'15:00',stg:'R32',s1:'ch',s2:'dz',v:'Vancouver'},
+  {id:86,date:'2026-07-03',time:'15:00',stg:'R32',s1:'ar',s2:'cv',v:'Miami'},
+  {id:87,date:'2026-07-03',time:'15:00',stg:'R32',s1:'co',s2:'gh',v:'Kansas City'},
+  {id:88,date:'2026-07-03',time:'15:00',stg:'R32',s1:'au',s2:'eg',v:'Dallas'},
   // R16 (Octavos)
   {id:89,date:'2026-07-04',time:'15:00',stg:'R16',s1:'W74',s2:'W77',v:'Filadelfia'},
   {id:90,date:'2026-07-04',time:'15:00',stg:'R16',s1:'W73',s2:'W75',v:'Houston'},
@@ -680,6 +680,7 @@ function matchPoints(name, id){
 // resolveTeamReal(slot): only real data; null if not yet known
 function resolveTeamReal(slot){
   if(!slot) return null;
+  if(TEAMS[slot]) return slot; // equipo directo (R32 ya resuelto)
   if(/^[12]([A-L])$/.test(slot)){
     const grp = slot[1], pos = +slot[0]-1;
     const done = MATCHES.filter(m=>m.grp===grp).every(m=>realSrc(m.id));
@@ -710,6 +711,7 @@ function resolveTeamReal(slot){
 // resolveTeamPred(slot,name): user's predicted progression
 function resolveTeamPred(slot,name){
   if(!slot) return null;
+  if(TEAMS[slot]) return slot; // equipo directo (R32 ya resuelto)
   const p = preds[name];
   if(!p) return null;
   if(/^[12]([A-L])$/.test(slot)){
@@ -746,6 +748,20 @@ function resolveSlotDisplay(slot,name){
 }
 
 /* ============ SCORING ============ */
+function inRealSet(val, real){
+  if(real==null||real==='') return false;
+  const arr = Array.isArray(real)?real:[real];
+  return arr.indexOf(val)>=0;
+}
+function realMultiArr(key){ const v=realSp[key]; return Array.isArray(v)?v.slice():(v?[v]:[]); }
+function renderRealMulti(key,label){
+  const arr = realMultiArr(key);
+  const chips = arr.length ? arr.map(c=>`<span class="tag real" style="margin:2px 4px 2px 0;display:inline-block">${flagImg(c,12)} ${teamName(c)} <a href="#" onclick="removeRealMulti('${key}','${c}');return false" style="color:var(--bad);text-decoration:none;font-weight:700">\u2715</a></span>`).join('') : '<span class="muted">ninguno</span>';
+  const addOpts = `<option value="">+ agregar\u2026</option>` + Object.keys(TEAMS).filter(c=>arr.indexOf(c)<0).map(c=>`<option value="${c}">${TEAMS[c].n}</option>`).join('');
+  return `<div class="row" style="align-items:flex-start"><label>${label}:</label><div><div style="margin-bottom:4px">${chips}</div><select onchange="addRealMulti('${key}',this.value)">${addOpts}</select></div></div>`;
+}
+function addRealMulti(key,code){ if(!code) return; const arr=realMultiArr(key); if(arr.indexOf(code)<0){ arr.push(code); realSp[key]=arr; saveRealSp(); render(); } }
+function removeRealMulti(key,code){ realSp[key]=realMultiArr(key).filter(c=>c!==code); saveRealSp(); render(); }
 function calcBreakdown(name){
   const b = {esp:0,grp:0,r32:0,r16:0,qf:0,sf:0,fin:0};
   const p = preds[name];
@@ -755,9 +771,9 @@ function calcBreakdown(name){
   // 10 - lesionado, 15 - campeón, 10 - subcampeón, 5 - tercero
   const sp = p.sp||{}, rsp = realSp||{};
   if(sp.goleador && rsp.goleador && namesMatch(sp.goleador, rsp.goleador)) b.esp+=5;
-  if(sp.masGoleador && rsp.masGoleador && sp.masGoleador===rsp.masGoleador) b.esp+=3;
-  if(sp.masGoleado && rsp.masGoleado && sp.masGoleado===rsp.masGoleado) b.esp+=3;
-  if(sp.masExpulsados && rsp.masExpulsados && sp.masExpulsados===rsp.masExpulsados) b.esp+=3;
+  if(sp.masGoleador && inRealSet(sp.masGoleador, rsp.masGoleador)) b.esp+=3;
+  if(sp.masGoleado && inRealSet(sp.masGoleado, rsp.masGoleado)) b.esp+=3;
+  if(sp.masExpulsados && inRealSet(sp.masExpulsados, rsp.masExpulsados)) b.esp+=3;
   if(sp.lesionado && rsp.lesionado && namesMatch(sp.lesionado, rsp.lesionado)) b.esp+=10;
   if(sp.campeon && rsp.campeon && sp.campeon===rsp.campeon) b.esp+=15;
   if(sp.subcampeon && rsp.subcampeon && sp.subcampeon===rsp.subcampeon) b.esp+=10;
@@ -1401,9 +1417,9 @@ function renderAdminEsp(){
         <div class="row"><label>Lesionado:</label><input type="text" id="rsp_lesionado" value="${(realSp.lesionado||'').replace(/"/g,'&quot;')}"></div>
       </div>
       <div>
-        <div class="row"><label>Más goleador:</label><select id="rsp_masGoleador">${opts('masGoleador')}</select></div>
-        <div class="row"><label>Más goleado:</label><select id="rsp_masGoleado">${opts('masGoleado')}</select></div>
-        <div class="row"><label>Más expulsados:</label><select id="rsp_masExpulsados">${opts('masExpulsados')}</select></div>
+        ${renderRealMulti('masGoleador','Más goleador')}
+        ${renderRealMulti('masGoleado','Más goleado')}
+        ${renderRealMulti('masExpulsados','Más expulsados')}
         <div class="row"><label>Campeón:</label><select id="rsp_campeon">${opts('campeon')}</select></div>
         <div class="row"><label>Subcampeón:</label><select id="rsp_subcampeon">${opts('subcampeon')}</select></div>
         <div class="row"><label>3er puesto:</label><select id="rsp_tercero">${opts('tercero')}</select></div>
@@ -1565,7 +1581,7 @@ function setPgGoals(pl,v){
 }
 function saveAdminEsp(){
   ['goleador','lesionado'].forEach(k=>realSp[k]=document.getElementById('rsp_'+k).value.trim());
-  ['masGoleador','masGoleado','masExpulsados','campeon','subcampeon','tercero'].forEach(k=>realSp[k]=document.getElementById('rsp_'+k).value);
+  ['campeon','subcampeon','tercero'].forEach(k=>realSp[k]=document.getElementById('rsp_'+k).value);
   saveRealSp();render();
 }
 
@@ -1654,10 +1670,26 @@ function renderAdminUsers(){
   }
   h += `</div>`;
   h += `<div class="card"><h3>Mantenimiento</h3>
-    <button class="btn danger" onclick="adminClearReal()">Borrar resultados reales</button>
+    <button class="btn danger" onclick="adminClearKOPreds()">Limpiar predicciones de eliminatoria (todos)</button>
+    <button class="btn danger" style="margin-left:8px" onclick="adminClearReal()">Borrar resultados reales</button>
     <button class="btn danger" style="margin-left:8px" onclick="adminResetAll()">Reset total</button>
+    <p class="muted" style="font-size:12px;margin-top:8px">"Limpiar predicciones de eliminatoria" borra solo los partidos de KO (32avos a Final) de todos los participantes y reabre la edición. Las predicciones de grupos quedan intactas.</p>
   </div>`;
   return h;
+}
+function adminClearKOPreds(){
+  if(!confirm('¿Borrar las predicciones de ELIMINATORIA (32avos a Final) de TODOS los participantes y reabrir la edición?\n\n• Las predicciones de GRUPOS quedan intactas.\n• No se puede deshacer.')) return;
+  const koIds = MATCHES.filter(m=>m.stg).map(m=>m.id);
+  const updates = {};
+  Object.keys(preds).forEach(name=>{
+    const pm = preds[name] && preds[name].m;
+    if(!pm) return;
+    koIds.forEach(id=>{ if(pm[id]!=null) updates['preds/'+name+'/m/'+id]=null; });
+  });
+  real.koClosed = false;
+  Promise.all([ db.ref().update(updates), db.ref('real/koClosed').set(false) ])
+    .then(()=>{ alert('Listo: predicciones de eliminatoria borradas y edición reabierta.'); render(); })
+    .catch(e=>alert('Error: '+e.message));
 }
 function adminDelUser(n){
   if(!confirm(`¿Borrar usuario "${n}" y sus predicciones?`)) return;
