@@ -783,7 +783,7 @@ function renderRealMulti(key,label){
 function addRealMulti(key,code){ if(!code) return; const arr=realMultiArr(key); if(arr.indexOf(code)<0){ arr.push(code); realSp[key]=arr; saveRealSp(); render(); } }
 function removeRealMulti(key,code){ realSp[key]=realMultiArr(key).filter(c=>c!==code); saveRealSp(); render(); }
 function calcBreakdown(name){
-  const b = {esp:0,espPG:0,espRest:0,grp:0,grpM:0,grpP:0,r32:0,r16:0,qf:0,sf:0,fin:0};
+  const b = {esp:0,espPG:0,espRest:0,grp:0,grpM:0,grpP:0,r32m:0,r32c:0,r16m:0,r16c:0,qfm:0,qfc:0,sfm:0,sfc:0,finm:0,r32:0,r16:0,qf:0,sf:0,fin:0};
   const p = preds[name];
   if(!p) return b;
   // ---- ESPECIALES ----
@@ -852,28 +852,25 @@ function calcBreakdown(name){
     const pr = p.m && p.m[m.id];
     const rr = real.m[m.id];
     if(!pr||pr.h==null||pr.a==null||!rr||rr.h==null||rr.a==null) return;
-    if(pr.h===rr.h && pr.a===rr.a) b.r32+=3;
-    else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b.r32+=1;
-    // bonus: +1 if predicted winner advances in real (real winner == predicted winner)
+    if(pr.h===rr.h && pr.a===rr.a) b.r32m+=3;
+    else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b.r32m+=1;
+    // clasificados: +1 si tu ganador avanza
     const t1Real = resolveTeamReal(m.s1), t2Real = resolveTeamReal(m.s2);
     const t1Pred = resolveTeamPred(m.s1,name), t2Pred = resolveTeamPred(m.s2,name);
     if(t1Real&&t2Real&&t1Pred&&t2Pred){
       let realWin, predWin;
       if(rr.h>rr.a) realWin=t1Real; else if(rr.a>rr.h) realWin=t2Real; else realWin=(rr.ph>rr.pa?t1Real:t2Real);
       if(pr.h>pr.a) predWin=t1Pred; else if(pr.a>pr.h) predWin=t2Pred; else predWin=(pr.ph>pr.pa?t1Pred:t2Pred);
-      if(realWin===predWin) b.r32+=1;
+      if(realWin===predWin) b.r32c+=1;
     }
   });
   // ---- R16/QF/SF/TP/FIN ----
-  const koStages = {R16:'r16',QF:'qf',SF:'sf',TP:'sf',FIN:'fin'}; // TP & FIN both count in fin? Per spec: SF/FIN. Let's put TP in sf bucket since spec breakdown is SF·FIN.
-  // Actually spec says columns: Total · ESP · GRP · R32 · OCT · CTO · SF · FIN. So OCT=R16, CTO=QF, SF=SF+TP, FIN=Final.
-  const koBucket = {R16:'r16',QF:'qf',SF:'sf',TP:'sf',FIN:'fin'};
+  const koM = {R16:'r16m',QF:'qfm',SF:'sfm',TP:'finm',FIN:'finm'}; // partidos
+  const koC = {R16:'r16c',QF:'qfc',SF:'sfc'};                        // clasificados (3°/Final no tienen)
   MATCHES.filter(m=>['R16','QF','SF','TP','FIN'].includes(m.stg)).forEach(m=>{
     const pr = p.m && p.m[m.id];
     const rr = real.m[m.id];
     if(!pr||pr.h==null||pr.a==null||!rr||rr.h==null||rr.a==null) return;
-    const bucket = koBucket[m.stg];
-    // Winner: 2pts
     const t1Real = resolveTeamReal(m.s1), t2Real = resolveTeamReal(m.s2);
     const t1Pred = resolveTeamPred(m.s1,name), t2Pred = resolveTeamPred(m.s2,name);
     let realWin=null, predWin=null;
@@ -886,19 +883,20 @@ function calcBreakdown(name){
     const cruceOK = t1Real&&t2Real&&t1Pred&&t2Pred && t1Pred===t1Real && t2Pred===t2Real;
     // Exacto (5) o signo gana/empate/pierde (2), EXCLUYENTES y solo si acertaste el cruce
     if(cruceOK){
-      if(pr.h===rr.h && pr.a===rr.a) b[bucket]+=5;
-      else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b[bucket]+=2;
+      if(pr.h===rr.h && pr.a===rr.a) b[koM[m.stg]]+=5;
+      else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b[koM[m.stg]]+=2;
     }
-    // Avance (+1): tu ganador efectivamente avanza (independiente del cruce; no aplica en 3°/Final)
+    // clasificados (+1): tu ganador avanza (no aplica en 3°/Final)
     if(m.stg!=='FIN' && m.stg!=='TP'){
-      if(realWin&&predWin&&realWin===predWin) b[bucket]+=1;
+      if(realWin&&predWin&&realWin===predWin) b[koC[m.stg]]+=1;
     }
   });
+  b.r32 = b.r32m+b.r32c; b.r16 = b.r16m+b.r16c; b.qf = b.qfm+b.qfc; b.sf = b.sfm+b.sfc; b.fin = b.finm;
   return b;
 }
 function calcScore(name){
   const b = calcBreakdown(name);
-  return b.esp+b.grp+b.r32+b.r16+b.qf+b.sf+b.fin;
+  return b.espPG+b.espRest + b.grpM+b.grpP + b.r32m+b.r32c + b.r16m+b.r16c + b.qfm+b.qfc + b.sfm+b.sfc + b.finm;
 }
 
 /* ============ RENDER ROUTER ============ */
@@ -1344,14 +1342,16 @@ function renderRanking(){
   }).sort((a,b)=>b.tot-a.tot);
   let h = `<div class="section"><h2>Ranking</h2></div>
     <div class="card">
+    <div style="overflow-x:auto">
     <table>
-      <thead><tr><th>#</th><th>Participante</th><th>Total</th><th>P.Gol</th><th>Esp.</th><th>GRP part.</th><th>GRP 1/2/3</th><th>R32</th><th>OCT</th><th>CTO</th><th>SF</th><th>FIN</th></tr></thead>
+      <thead><tr><th>#</th><th>Participante</th><th>Total</th><th>Punto Gol</th><th>Especiales</th><th>Grupos – Partidos</th><th>Grupos – 1°/2°/3°</th><th>16avos – partidos</th><th>16avos – clasificados</th><th>8vos – partidos</th><th>8vos – clasificados</th><th>4tos – partidos</th><th>4tos – clasificados</th><th>Semis – partidos</th><th>Semis – clasificados</th><th>Final y 3er puesto – partidos</th></tr></thead>
       <tbody>${rows.map((r,i)=>`<tr ${r.name===currentUser?'style="background:rgba(88,166,255,.08)"':''}>
         <td>${i+1}</td><td><b>${r.name}</b></td>
         <td><b style="color:var(--acc2)">${fmtPts(r.tot)}</b></td>
-        <td>${fmtPts(r.espPG)}</td><td>${fmtPts(r.espRest)}</td><td>${r.grpM}</td><td>${r.grpP}</td><td>${r.r32}</td><td>${r.r16}</td><td>${r.qf}</td><td>${r.sf}</td><td>${r.fin}</td>
+        <td>${fmtPts(r.espPG)}</td><td>${fmtPts(r.espRest)}</td><td>${r.grpM}</td><td>${r.grpP}</td><td>${r.r32m}</td><td>${r.r32c}</td><td>${r.r16m}</td><td>${r.r16c}</td><td>${r.qfm}</td><td>${r.qfc}</td><td>${r.sfm}</td><td>${r.sfc}</td><td>${r.finm}</td>
       </tr>`).join('')}</tbody>
     </table>
+    </div>
     ${rows.length===0?'<p class="muted" style="text-align:center;padding:20px">Todavía no hay participantes registrados.</p>':''}
     </div>`;
   document.getElementById('tab-ranking').innerHTML = h;
