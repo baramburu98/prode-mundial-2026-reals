@@ -481,6 +481,19 @@ function findMatchingGoals(playerName, pgGoals){
   }
   return 0;
 }
+// Goles del jugador buscándolo en la tabla de goleadores real (nombre canónico de la API)
+function scorerGoalsByName(playerName){
+  if(!playerName || !realScorers) return 0;
+  let best=0;
+  for(const k of Object.keys(realScorers)){
+    if(namesMatch(playerName,k)){
+      const info=realScorers[k];
+      const g=(typeof info==='number')?info:((info&&info.goals)||0);
+      if(g>best) best=g;
+    }
+  }
+  return best;
+}
 
 /* ============ LOGIN ============ */
 function showLogin(){document.getElementById('login').style.display='flex';resetLogin()}
@@ -661,8 +674,7 @@ function matchPoints(name, id){
       if(rw===pw){pts+=1; parts.push('avance +1');}
     }
   } else {
-    // R16/QF/SF/TP/FIN: 5 exact, 2 winner, +1 winner advances (except FIN/TP)
-    if(pr.h===rr.h && pr.a===rr.a){pts+=5; parts.push('exacto +5');}
+    // R16/QF/SF/TP/FIN: exacto(5) o ganador(2) solo si acertás el cruce; avance(+1) aparte
     const t1R=resolveTeamReal(m.s1),t2R=resolveTeamReal(m.s2);
     const t1P=resolveTeamPred(m.s1,name),t2P=resolveTeamPred(m.s2,name);
     let rw=null,pw=null;
@@ -672,9 +684,13 @@ function matchPoints(name, id){
     if(t1P&&t2P){
       if(pr.h>pr.a) pw=t1P; else if(pr.a>pr.h) pw=t2P; else if(pr.ph!=null&&pr.pa!=null) pw=(pr.ph>pr.pa?t1P:t2P);
     }
-    if(rw&&pw&&rw===pw){
-      pts+=2; parts.push('ganador +2');
-      if(m.stg!=='FIN'&&m.stg!=='TP'){pts+=1; parts.push('avance +1');}
+    const cruceOK = t1R&&t2R&&t1P&&t2P && t1P===t1R && t2P===t2R;
+    if(cruceOK){
+      if(pr.h===rr.h && pr.a===rr.a){pts+=5; parts.push('exacto +5');}
+      else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)){pts+=2; parts.push('signo +2');}
+    }
+    if(m.stg!=='FIN'&&m.stg!=='TP'){
+      if(rw&&pw&&rw===pw){pts+=1; parts.push('avance +1');}
     }
   }
   return {total: pts, detail: parts.join(', ')||'sin puntos'};
@@ -786,7 +802,7 @@ function calcBreakdown(name){
   const pgRealGoals = (realGoals.pg)||{};
   (p.pg||[]).forEach(player=>{
     if(!player) return;
-    const g = findMatchingGoals(player, pgRealGoals);
+    const g = Math.max(findMatchingGoals(player, pgRealGoals), scorerGoalsByName(player));
     if(g) b.espPG += g;
   });
   // TRIVIA NUMÉRICA: 5 preguntas x 5pts. Los que estén más cerca del valor real se llevan los 5.
@@ -867,10 +883,13 @@ function calcBreakdown(name){
     if(t1Pred&&t2Pred){
       if(pr.h>pr.a) predWin=t1Pred; else if(pr.a>pr.h) predWin=t2Pred; else if(pr.ph!=null&&pr.pa!=null) predWin=(pr.ph>pr.pa?t1Pred:t2Pred);
     }
-    if(realWin&&predWin&&realWin===predWin) b[bucket]+=2;
-    // Exact score: 5pts (regular time)
-    if(pr.h===rr.h && pr.a===rr.a) b[bucket]+=5;
-    // Bonus +1 if predicted winner advances (only for non-final rounds where there's a next match)
+    const cruceOK = t1Real&&t2Real&&t1Pred&&t2Pred && t1Pred===t1Real && t2Pred===t2Real;
+    // Exacto (5) o signo gana/empate/pierde (2), EXCLUYENTES y solo si acertaste el cruce
+    if(cruceOK){
+      if(pr.h===rr.h && pr.a===rr.a) b[bucket]+=5;
+      else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b[bucket]+=2;
+    }
+    // Avance (+1): tu ganador efectivamente avanza (independiente del cruce; no aplica en 3°/Final)
     if(m.stg!=='FIN' && m.stg!=='TP'){
       if(realWin&&predWin&&realWin===predWin) b[bucket]+=1;
     }
