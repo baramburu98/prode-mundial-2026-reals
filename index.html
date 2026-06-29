@@ -328,6 +328,7 @@ const DEADLINE_KO_MS  = Date.parse('2026-06-28T16:00:00Z'); // 28 jun 13:00 ART
 // Cierres individuales de partidos de eliminatoria (5 min antes del inicio). Timestamps en UTC.
 const KO_LOCKS = { 73: Date.parse('2026-06-28T18:55:00Z') }; // M73 Sudáfrica-Canadá: cierra 15:55 ART (arranca 16:00)
 function isMatchTimeLocked(id){ return KO_LOCKS[id]!=null && Date.now() >= KO_LOCKS[id]; }
+const DEADLINE_KO_ALL_MS = Date.parse('2026-06-29T16:45:00Z'); // cierre global eliminatoria: 29 jun 13:45 ART
 
 /* ============ STATE & FIREBASE ============ */
 const firebaseConfig = {
@@ -548,7 +549,7 @@ function teamName(code){return code&&TEAMS[code]?TEAMS[code].n:'—'}
 // Formato de puntos: entero sin decimales, fraccional con 2 (trivia divide por empates)
 function fmtPts(n){if(n==null||isNaN(n))return '0';const r=Math.round(n*100)/100;return r===Math.floor(r)?String(r):r.toFixed(2)}
 function isLockedGrp(){return (real&&real.phase==='ko') || Date.now()>=DEADLINE_GRP_MS}
-function isLockedKO(){return real&&real.koClosed===true}
+function isLockedKO(){return (real&&real.koClosed===true) || Date.now()>=DEADLINE_KO_ALL_MS}
 function isPhaseKO(){return real&&real.phase==='ko'}
 function fmtDate(iso){
   const d = new Date(iso+'T12:00:00');
@@ -1190,7 +1191,7 @@ function renderStandingsTable(st){
 function renderPredKO(p){
   const lockedKO = isLockedKO();
   let h = lockedKO
-    ? `<div class="lock">🔒 Eliminatoria cerrada por admin</div>`
+    ? `<div class="lock">🔒 Eliminatoria cerrada</div>`
     : `<div class="warn-banner">⏰ Eliminatoria abierta · editás hasta que el admin cierre</div>`;
   h += `<div class="legend">
     <span><span class="dot" style="background:var(--pred)"></span>Slot predicho</span>
