@@ -677,12 +677,13 @@ function matchPoints(name, id){
     // R16/QF/SF/TP/FIN: exacto(5) o ganador(2) solo si acertás el cruce; avance(+1) aparte
     const t1R=resolveTeamReal(m.s1),t2R=resolveTeamReal(m.s2);
     const t1P=resolveTeamPred(m.s1,name),t2P=resolveTeamPred(m.s2,name);
-    let rw=null,pw=null;
+    const d1=resolveSlotDisplay(m.s1,name), d2=resolveSlotDisplay(m.s2,name);
+    let rw=null,pwDisp=null;
     if(t1R&&t2R){
       if(rr.h>rr.a) rw=t1R; else if(rr.a>rr.h) rw=t2R; else if(rr.ph!=null&&rr.pa!=null) rw=(rr.ph>rr.pa?t1R:t2R);
     }
-    if(t1P&&t2P){
-      if(pr.h>pr.a) pw=t1P; else if(pr.a>pr.h) pw=t2P; else if(pr.ph!=null&&pr.pa!=null) pw=(pr.ph>pr.pa?t1P:t2P);
+    if(d1&&d2){
+      if(pr.h>pr.a) pwDisp=d1.team; else if(pr.a>pr.h) pwDisp=d2.team; else if(pr.ph!=null&&pr.pa!=null) pwDisp=(pr.ph>pr.pa?d1.team:d2.team);
     }
     const cruceOK = t1R&&t2R&&t1P&&t2P && t1P===t1R && t2P===t2R;
     if(cruceOK){
@@ -690,7 +691,7 @@ function matchPoints(name, id){
       else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)){pts+=2; parts.push('signo +2');}
     }
     if(m.stg!=='FIN'&&m.stg!=='TP'){
-      if(rw&&pw&&rw===pw){pts+=1; parts.push('avance +1');}
+      if(rw&&pwDisp&&rw===pwDisp){pts+=1; parts.push('avance +1');}
     }
   }
   return {total: pts, detail: parts.join(', ')||'sin puntos'};
@@ -873,22 +874,23 @@ function calcBreakdown(name){
     if(!pr||pr.h==null||pr.a==null||!rr||rr.h==null||rr.a==null) return;
     const t1Real = resolveTeamReal(m.s1), t2Real = resolveTeamReal(m.s2);
     const t1Pred = resolveTeamPred(m.s1,name), t2Pred = resolveTeamPred(m.s2,name);
-    let realWin=null, predWin=null;
+    const d1c = resolveSlotDisplay(m.s1,name), d2c = resolveSlotDisplay(m.s2,name);
+    let realWin=null, predWinDisp=null;
     if(t1Real&&t2Real){
       if(rr.h>rr.a) realWin=t1Real; else if(rr.a>rr.h) realWin=t2Real; else if(rr.ph!=null&&rr.pa!=null) realWin=(rr.ph>rr.pa?t1Real:t2Real);
     }
-    if(t1Pred&&t2Pred){
-      if(pr.h>pr.a) predWin=t1Pred; else if(pr.a>pr.h) predWin=t2Pred; else if(pr.ph!=null&&pr.pa!=null) predWin=(pr.ph>pr.pa?t1Pred:t2Pred);
+    if(d1c&&d2c){
+      if(pr.h>pr.a) predWinDisp=d1c.team; else if(pr.a>pr.h) predWinDisp=d2c.team; else if(pr.ph!=null&&pr.pa!=null) predWinDisp=(pr.ph>pr.pa?d1c.team:d2c.team);
     }
     const cruceOK = t1Real&&t2Real&&t1Pred&&t2Pred && t1Pred===t1Real && t2Pred===t2Real;
-    // Exacto (5) o signo gana/empate/pierde (2), EXCLUYENTES y solo si acertaste el cruce
+    // Exacto (5) o signo (2), EXCLUYENTES y solo si acertaste tu propio cruce predicho
     if(cruceOK){
       if(pr.h===rr.h && pr.a===rr.a) b[koM[m.stg]]+=5;
       else if(Math.sign(pr.h-pr.a)===Math.sign(rr.h-rr.a)) b[koM[m.stg]]+=2;
     }
-    // clasificados (+1): tu ganador avanza (no aplica en 3°/Final)
+    // clasificados (+1): el equipo que pusiste ganando (real si dejaste el cruce sin completar) avanza
     if(m.stg!=='FIN' && m.stg!=='TP'){
-      if(realWin&&predWin&&realWin===predWin) b[koC[m.stg]]+=1;
+      if(realWin&&predWinDisp&&realWin===predWinDisp) b[koC[m.stg]]+=1;
     }
   });
   b.r32 = b.r32m+b.r32c; b.r16 = b.r16m+b.r16c; b.qf = b.qfm+b.qfc; b.sf = b.sfm+b.sfc; b.fin = b.finm;
@@ -1724,10 +1726,81 @@ function adminDelUser(n){
 
 let adminSelectedUser = '';
 function setAdminSelectedUser(n){adminSelectedUser=n;render()}
+function exportPronosticosPDF(){
+  const names=Object.keys(users).sort();
+  if(!names.length){ alert('No hay participantes.'); return; }
+  const tn=c=>c?teamName(c):'—';
+  const stages=['R32','R16','QF','SF','TP','FIN'];
+  const pages=names.map(n=>{
+    const p=preds[n]||{m:{},sp:{},pg:[]}; const sp=p.sp||{};
+    const b=calcBreakdown(n); const tot=calcScore(n);
+    const multi=k=>{ const v=sp[k]; if(!v) return '—'; return Array.isArray(v)?v.map(tn).join(', '):tn(v); };
+    const esp=`<table class="t"><tbody>
+      <tr><td>Campeón</td><td>${tn(sp.campeon)}</td></tr>
+      <tr><td>Subcampeón</td><td>${tn(sp.subcampeon)}</td></tr>
+      <tr><td>3er puesto</td><td>${tn(sp.tercero)}</td></tr>
+      <tr><td>Más goleador</td><td>${multi('masGoleador')}</td></tr>
+      <tr><td>Más goleado</td><td>${multi('masGoleado')}</td></tr>
+      <tr><td>Más expulsados</td><td>${multi('masExpulsados')}</td></tr>
+      <tr><td>Goleador</td><td>${(sp.goleador||'—')}</td></tr>
+      <tr><td>Lesionado</td><td>${(sp.lesionado||'—')}</td></tr>
+      <tr><td>Punto Gol</td><td>${(p.pg||[]).filter(x=>x).join(', ')||'—'}</td></tr>
+      <tr><td>Trivia G/A/R/C/P</td><td>${[sp.trivGoals,sp.trivAmar,sp.trivRojas,sp.trivCorners,sp.trivPenales].map(v=>v==null?'—':v).join(' / ')}</td></tr>
+    </tbody></table>`;
+    let ko='<table class="t"><thead><tr><th>Partido</th><th>Cruce predicho</th><th>Marcador</th></tr></thead><tbody>';
+    stages.forEach(stg=>{ MATCHES.filter(m=>m.stg===stg).forEach(m=>{
+      const t1=resolveTeamPred(m.s1,n),t2=resolveTeamPred(m.s2,n);
+      const x=(p.m&&p.m[m.id])||{}; const has=x.h!=null&&x.a!=null;
+      const pen=(has&&x.h===x.a&&x.ph!=null)?` (P${x.ph}-${x.pa})`:'';
+      ko+=`<tr><td>${STAGE_LABEL[stg]} M${m.id}</td><td>${t1?teamName(t1):'?'} vs ${t2?teamName(t2):'?'}</td><td>${has?(x.h+'-'+x.a+pen):'—'}</td></tr>`;
+    });});
+    ko+='</tbody></table>';
+    return `<section>
+      <h1>${n}</h1>
+      <p class="tot">Total: ${fmtPts(tot)} pts</p>
+      <p class="sub">Fase de grupos: ${b.grpM+b.grpP} pts (partidos ${b.grpM} · posiciones ${b.grpP}) &nbsp;·&nbsp; Punto Gol: ${fmtPts(b.espPG)} pts &nbsp;·&nbsp; Especiales: ${fmtPts(b.espRest)} pts</p>
+      <h2>Especiales</h2>${esp}
+      <h2>Eliminatoria</h2>${ko}
+    </section>`;
+  }).join('');
+  const css=`@page{margin:14mm} body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:11px} section{page-break-after:always} section:last-child{page-break-after:auto} h1{margin:0 0 2px 0;font-size:20px} h2{font-size:13px;margin:12px 0 4px;border-bottom:1px solid #ccc;padding-bottom:2px} .tot{font-size:14px;font-weight:bold;margin:0} .sub{color:#444;margin:2px 0 8px;font-size:11px} table.t{width:100%;border-collapse:collapse;margin-bottom:4px} table.t td,table.t th{border:1px solid #ddd;padding:3px 6px;text-align:left} table.t th{background:#f0f0f0}`;
+  const w=window.open('','_blank');
+  if(!w){ alert('Permití las ventanas emergentes para exportar el PDF.'); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pronósticos Prode Mundial 2026</title><style>${css}</style></head><body>${pages}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 700);
+}
+function renderAdminKOResumen(names){
+  const stages=['R32','R16','QF','SF','TP','FIN'];
+  let h=`<div class="card"><h3>Eliminatoria — pronóstico de cada participante</h3>
+   <p class="muted" style="font-size:12px">El cruce que predijo cada uno (los equipos difieren según lo que cargó) y su marcador. "?" = no se puede resolver el equipo porque dejó un partido anterior sin cargar. "—" = sin marcador.</p>`;
+  names.forEach(n=>{
+    let blanks=0;
+    stages.forEach(stg=>MATCHES.filter(m=>m.stg===stg).forEach(m=>{ const x=(preds[n]&&preds[n].m&&preds[n].m[m.id])||{}; if(x.h==null||x.a==null) blanks++; }));
+    h+=`<details style="margin-bottom:8px"><summary style="cursor:pointer;font-weight:600;padding:6px 0">${n} ${blanks?`<span style="color:var(--bad);font-weight:400">· faltan ${blanks} KO</span>`:'<span style="color:var(--acc2);font-weight:400">· completo</span>'}</summary>
+      <div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th>M</th><th style="text-align:left">Cruce predicho por ${n}</th><th>Marcador</th></tr></thead><tbody>`;
+    stages.forEach(stg=>{
+      MATCHES.filter(m=>m.stg===stg).forEach(m=>{
+        const t1=resolveTeamPred(m.s1,n), t2=resolveTeamPred(m.s2,n);
+        const x=(preds[n]&&preds[n].m&&preds[n].m[m.id])||{};
+        const has=x.h!=null&&x.a!=null;
+        const pen=(has&&x.h===x.a&&x.ph!=null)?` (P${x.ph}-${x.pa})`:'';
+        const c1=t1?teamName(t1):'<span style="color:var(--bad)">?</span>';
+        const c2=t2?teamName(t2):'<span style="color:var(--bad)">?</span>';
+        h+=`<tr><td>M${m.id}</td><td style="text-align:left">${c1} vs ${c2}</td><td style="${has?'':'color:var(--bad)'}">${has?(x.h+'-'+x.a+pen):'—'}</td></tr>`;
+      });
+    });
+    h+=`</tbody></table></div></details>`;
+  });
+  h+=`</div>`;
+  return h;
+}
 function renderAdminPreds(){
   const names = Object.keys(users).sort();
   if(names.length===0) return `<div class="card"><p class="muted">No hay participantes registrados.</p></div>`;
   let h = '';
+  h += `<div class="card"><h3>Exportar</h3><button class="btn" onclick="exportPronosticosPDF()">📄 Exportar pronósticos a PDF (una página por usuario)</button><p class="muted" style="font-size:12px;margin-top:6px">Abre una ventana lista para imprimir o guardar como PDF, con una página por participante (especiales, puntos de fase de grupos y cuadro de eliminatoria).</p></div>`;
+  h += renderAdminKOResumen(names);
   // ============ RESUMEN GLOBAL ============
   h += `<div class="card"><h3>Resumen de predicciones especiales (todos los participantes)</h3>`;
   h += `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
