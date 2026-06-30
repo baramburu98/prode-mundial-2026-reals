@@ -1241,15 +1241,13 @@ function renderPredKORow(m, locked){
       return `<div class="t"><span class="muted">${label}</span></div>`;
     }
     const extra = slot.startsWith('3:') ? '<span class="tag muted">3°</span>' : '';
-    // Si phase==ko Y el equipo real difiere de la predicción del usuario, mostrar "habías predicho"
-    let origNote = '';
-    if(td.source==='real' && isPhaseKO()){
-      const origTeam = resolveTeamPred(slot, me);
-      if(origTeam && origTeam !== td.team){
-        origNote = `<div style="font-size:10px;color:var(--mute);width:100%;margin-top:2px">habías predicho: <b>${teamName(origTeam)}</b></div>`;
-      }
-    }
-    return `<div class="t" style="flex-wrap:wrap"><img src="${flagUrl(td.team)}" onerror="this.style.visibility='hidden'"><span>${teamName(td.team)}</span>${extra}<span class="${tagSrc(td.source)}">${td.source==='real'?'real':'pred'}</span>${origNote}</div>`;
+    // Tachar si el equipo que predijo NO es el que realmente avanzó (solo cuando ya se conoce el real)
+    const realTeam = resolveTeamReal(slot);
+    const fallo = (td.source==='pred' && realTeam && realTeam !== td.team);
+    const nameStyle = fallo ? 'text-decoration:line-through;opacity:.55' : '';
+    const flag = fallo ? '' : `<img src="${flagUrl(td.team)}" onerror="this.style.visibility='hidden'">`;
+    const tagFallo = fallo ? '<span class="tag" style="color:var(--bad);border-color:var(--bad)">no pasó</span>' : '';
+    return `<div class="t" style="flex-wrap:wrap">${flag}<span style="${nameStyle}">${teamName(td.team)}</span>${extra}${tagFallo}</div>`;
   };
   const showPens = (pr.h!=null && pr.a!=null && pr.h===pr.a);
   const cls = rr&&rr.h!=null ? 'match real' : 'match';
