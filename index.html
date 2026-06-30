@@ -762,10 +762,12 @@ function resolveTeamPred(slot,name){
 }
 // For display in "Mis Predicciones": real if available, else predicted
 function resolveSlotDisplay(slot,name){
-  const real_ = resolveTeamReal(slot);
-  if(real_) return {team:real_,source:'real'};
+  // En "Mis Predicciones" se muestra y puntúa SIEMPRE la predicción del usuario.
+  // Solo si no predijo ese cruce (lo dejó en blanco) se cae al equipo real.
   const pred = resolveTeamPred(slot,name);
-  return pred ? {team:pred,source:'pred'} : null;
+  if(pred) return {team:pred,source:'pred'};
+  const real_ = resolveTeamReal(slot);
+  return real_ ? {team:real_,source:'real'} : null;
 }
 
 /* ============ SCORING ============ */
